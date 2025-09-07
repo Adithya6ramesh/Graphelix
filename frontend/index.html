@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Take It Down - Report Harmful Content</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 25%, #334155 100%);
+            min-height: 100vh;
+            color: #e2e8f0;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            color: #f1f5f9;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            text-shadow: 0 4px 8px rgba(0,0,0,0.7);
+            background: linear-gradient(135deg, #3b82f6, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+            color: #cbd5e1;
+        }
+
+        .card {
+            background: linear-gradient(145deg, #1e293b, #334155);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.1);
+            transition: transform 0.3s ease;
+            border: 1px solid #475569;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.1);
+        }
+
+        .auth-section {
+            display: block;
+            margin-bottom: 20px;
+        }
+
+        .auth-form {
+            padding: 30px;
+            border: 2px solid #475569;
+            border-radius: 15px;
+            background: rgba(15, 23, 42, 0.5);
+            backdrop-filter: blur(10px);
+        }
+
+        .auth-form h3 {
+            margin-bottom: 20px;
+            color: #60a5fa;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+
+        .toggle-auth {
+            text-align: center;
+            margin-top: 20px;
+            color: #94a3b8;
+        }
+
+        .toggle-auth a {
+            color: #60a5fa;
+            text-decoration: none;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+
+        .toggle-auth a:hover {
+            color: #93c5fd;
+            text-decoration: underline;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #cbd5e1;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #475569;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #0f172a;
+            color: #e2e8f0;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+            background: #1e293b;
+        }
+
+        .form-group input::placeholder, .form-group textarea::placeholder {
+            color: #64748b;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #1e40af, #3b82f6);
+            color: white;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.5);
+            background: linear-gradient(135deg, #2563eb, #60a5fa);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .status.success {
+            background: linear-gradient(135deg, #064e3b, #065f46);
+            color: #6ee7b7;
+            border: 2px solid #10b981;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.2);
+        }
+
+        .status.error {
+            background: linear-gradient(135deg, #7f1d1d, #991b1b);
+            color: #fca5a5;
+            border: 2px solid #ef4444;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.2);
+        }
+
+        .status.info {
+            background: linear-gradient(135deg, #1e3a8a, #1e40af);
+            color: #93c5fd;
+            border: 2px solid #3b82f6;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .case-result {
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            border: 2px solid #475569;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        }
+
+        .case-result h4 {
+            color: #60a5fa;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .case-details {
+            font-family: 'Courier New', monospace;
+            background: #020617;
+            color: #22d3ee;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            margin-top: 10px;
+            border: 1px solid #334155;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .user-info {
+            background: linear-gradient(135deg, #0c4a6e, #0369a1);
+            border: 2px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #e0f2fe;
+            box-shadow: 0 4px 15px rgba(14, 165, 233, 0.2);
+        }
+
+        .logout-btn {
+            background: linear-gradient(135deg, #b91c1c, #dc2626);
+            margin-left: 10px;
+            padding: 8px 15px;
+            font-size: 14px;
+            box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);
+        }
+
+        .logout-btn:hover {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+            box-shadow: 0 6px 20px rgba(220, 38, 38, 0.4);
+        }
+
+        @media (max-width: 768px) {
+            .auth-section {
+                flex-direction: column;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1> Graphelix</h1>
+            <p> Strike back against harmful content</p>
+        </div>
+
+        <!-- Authentication Section -->
+        <div id="authSection" class="card">
+            <div class="auth-section">
+                <!-- Login Form -->
+                <div id="loginFormContainer" class="auth-form">
+                    <h3>🔑 Login</h3>
+                    <form id="loginForm">
+                        <div class="form-group">
+                            <label for="loginEmail">Username:</label>
+                            <input type="email" id="loginEmail" required placeholder="your@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="loginPassword">Password:</label>
+                            <input type="password" id="loginPassword" required placeholder="Your password">
+                        </div>
+                        <button type="submit" class="btn">Login</button>
+                    </form>
+                    <div class="toggle-auth">
+                        <p>Don't have an account? <a id="showRegister">Register here</a></p>
+                    </div>
+                </div>
+
+                <!-- Register Form -->
+                <div id="registerFormContainer" class="auth-form hidden">
+                    <h3>📝 Register</h3>
+                    <form id="registerForm">
+                        <div class="form-group">
+                            <label for="registerEmail">Email:</label>
+                            <input type="email" id="registerEmail" required placeholder="your@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerPassword">Password:</label>
+                            <input type="password" id="registerPassword" required placeholder="Choose a password">
+                        </div>
+                        <div class="form-group">
+                            <label for="registerRole">Role:</label>
+                            <select id="registerRole" required>
+                                <option value="victim">🙋‍♀️ Victim (Report Content)</option>
+                                <option value="officer">👮‍♀️ Officer (Review Cases)</option>
+                                <option value="admin">👑 Admin (Manage System)</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn">Register</button>
+                    </form>
+                    <div class="toggle-auth">
+                        <p>Already have an account? <a id="showLogin">Login here</a></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Info Section -->
+        <div id="userInfo" class="user-info hidden">
+            <span id="userDetails"></span>
+            <button id="logoutBtn" class="btn logout-btn">Logout</button>
+        </div>
+
+        <!-- Case Submission Section (Victims only) -->
+        <div id="caseSection" class="card hidden">
+            <h3 style="color: #60a5fa; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">📢 Report Harmful Content</h3>
+            <form id="caseForm">
+                <div class="form-group">
+                    <label for="contentUrl">Harmful Content URL:</label>
+                    <input type="url" id="contentUrl" placeholder="https://example.com/harmful-content">
+                    <small style="color: #64748b;">Enter the URL of the harmful content you want to report</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="fileHash">OR File Hash (SHA256):</label>
+                    <input type="text" id="fileHash" placeholder="abcd1234... (64 characters)">
+                    <small style="color: #64748b;">If reporting a file, enter its SHA256 hash instead of URL</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description:</label>
+                    <textarea id="description" rows="4" placeholder="Describe why this content is harmful and should be removed..."></textarea>
+                </div>
+
+                <button type="submit" class="btn">🚨 Submit Report</button>
+            </form>
+        </div>
+
+        <!-- Officer Dashboard -->
+        <div id="officerSection" class="card hidden">
+            <h3 style="color: #60a5fa; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">👮‍♀️ Officer Dashboard</h3>
+            <p style="color: #94a3b8; margin-bottom: 20px;">Review and manage submitted cases</p>
+            
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <button id="loadCasesBtn" class="btn">📋 Load Open Cases</button>
+                <button id="loadAllCasesBtn" class="btn">📊 Load All Cases</button>
+            </div>
+            
+            <div id="casesContainer">
+                <p style="color: #64748b; text-align: center; padding: 20px;">Click "Load Open Cases" to view cases requiring review</p>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <div id="adminSection" class="card hidden">
+            <h3 style="color: #60a5fa; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">👑 Admin Dashboard</h3>
+            <p style="color: #94a3b8; margin-bottom: 20px;">System administration and oversight</p>
+            
+            <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+                <button id="adminLoadCasesBtn" class="btn">📋 All Cases</button>
+                <button id="systemStatsBtn" class="btn">📊 System Stats</button>
+                <button id="userManagementBtn" class="btn">👥 User Management</button>
+            </div>
+            
+            <div id="adminContainer">
+                <p style="color: #64748b; text-align: center; padding: 20px;">Admin controls and system overview</p>
+            </div>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="statusContainer"></div>
+
+        <!-- Case Results -->
+        <div id="caseResults"></div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000';
+        let currentToken = null;
+        let currentUser = null;
+
+        // DOM Elements
+        const authSection = document.getElementById('authSection');
+        const userInfo = document.getElementById('userInfo');
+        const caseSection = document.getElementById('caseSection');
+        const officerSection = document.getElementById('officerSection');
+        const adminSection = document.getElementById('adminSection');
+        const statusContainer = document.getElementById('statusContainer');
+        const caseResults = document.getElementById('caseResults');
+
+        // Forms
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        const caseForm = document.getElementById('caseForm');
+        const logoutBtn = document.getElementById('logoutBtn');
+
+        // Auth toggle elements
+        const loginFormContainer = document.getElementById('loginFormContainer');
+        const registerFormContainer = document.getElementById('registerFormContainer');
+        const showRegisterBtn = document.getElementById('showRegister');
+        const showLoginBtn = document.getElementById('showLogin');
+
+        // Auth toggle functionality
+        showRegisterBtn.addEventListener('click', () => {
+            loginFormContainer.classList.add('hidden');
+            registerFormContainer.classList.remove('hidden');
+        });
+
+        showLoginBtn.addEventListener('click', () => {
+            registerFormContainer.classList.add('hidden');
+            loginFormContainer.classList.remove('hidden');
+        });
+
+        // Utility Functions
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            statusContainer.appendChild(statusDiv);
+
+            setTimeout(() => {
+                statusDiv.remove();
+            }, 5000);
+        }
+
+        function updateUI() {
+            if (currentToken && currentUser) {
+                authSection.classList.add('hidden');
+                userInfo.classList.remove('hidden');
+                
+                // Hide all role-specific sections first
+                caseSection.classList.add('hidden');
+                officerSection.classList.add('hidden');
+                adminSection.classList.add('hidden');
+                
+                // Show appropriate section based on role
+                switch(currentUser.role) {
+                    case 'victim':
+                        caseSection.classList.remove('hidden');
+                        break;
+                    case 'officer':
+                        officerSection.classList.remove('hidden');
+                        break;
+                    case 'admin':
+                        adminSection.classList.remove('hidden');
+                        break;
+                }
+                
+                document.getElementById('userDetails').textContent = 
+                    `Logged in as: ${currentUser.email} (${currentUser.role})`;
+            } else {
+                authSection.classList.remove('hidden');
+                userInfo.classList.add('hidden');
+                caseSection.classList.add('hidden');
+                officerSection.classList.add('hidden');
+                adminSection.classList.add('hidden');
+            }
+        }
+
+        async function apiCall(endpoint, options = {}) {
+            const url = `${API_BASE}${endpoint}`;
+            const config = {
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(currentToken && { 'Authorization': `Bearer ${currentToken}` })
+                },
+                ...options
+            };
+
+            console.log('Making API call to:', url);
+            console.log('Config:', config);
+
+            try {
+                const response = await fetch(url, config);
+                console.log('Response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || `HTTP ${response.status}`);
+                }
+                
+                return { data, status: response.status };
+            } catch (error) {
+                console.error('API Error:', error);
+                console.error('Error details:', error.message);
+                throw error;
+            }
+        }
+
+        // Authentication
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                showStatus('Logging in...', 'info');
+                
+                const result = await apiCall('/api/auth/login', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password })
+                });
+
+                currentToken = result.data.access_token;
+                
+                // Fetch user info to get the role
+                const userResult = await apiCall('/api/auth/me');
+                currentUser = userResult.data;
+                
+                showStatus('✅ Login successful!', 'success');
+                updateUI();
+                loginForm.reset();
+                
+            } catch (error) {
+                showStatus(`❌ Login failed: ${error.message}`, 'error');
+            }
+        });
+
+        registerForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            const role = document.getElementById('registerRole').value;
+
+            try {
+                showStatus('Creating account...', 'info');
+                
+                await apiCall('/api/auth/register', {
+                    method: 'POST',
+                    body: JSON.stringify({ email, password, role })
+                });
+
+                showStatus('✅ Account created! You can now login.', 'success');
+                registerForm.reset();
+                
+            } catch (error) {
+                showStatus(`❌ Registration failed: ${error.message}`, 'error');
+            }
+        });
+
+        // Case Submission
+        caseForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const url = document.getElementById('contentUrl').value;
+            const fileHash = document.getElementById('fileHash').value;
+            const description = document.getElementById('description').value;
+
+            if (!url && !fileHash) {
+                showStatus('❌ Please provide either a URL or file hash', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Submitting case...', 'info');
+                
+                const payload = { description };
+                if (url) payload.url = url;
+                if (fileHash) payload.file_hash = fileHash;
+
+                const result = await apiCall('/api/cases/', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
+
+                const isNew = !result.data.existing;
+                const statusCode = result.status;
+                
+                if (isNew) {
+                    showStatus('✅ New case created successfully!', 'success');
+                } else {
+                    showStatus('ℹ️ Content already reported - linked to existing case', 'info');
+                }
+
+                // Display case details
+                displayCaseResult(result.data, statusCode);
+                caseForm.reset();
+                
+            } catch (error) {
+                showStatus(`❌ Case submission failed: ${error.message}`, 'error');
+            }
+        });
+
+        function displayCaseResult(caseData, statusCode) {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'case-result';
+            
+            const statusText = statusCode === 201 ? 'NEW CASE CREATED' : 'LINKED TO EXISTING CASE';
+            const statusColor = statusCode === 201 ? '#22543d' : '#2a4365';
+            
+            resultDiv.innerHTML = `
+                <h4 style="color: ${statusColor}">📋 ${statusText}</h4>
+                <p><strong>Case ID:</strong> ${caseData.case_id}</p>
+                <p><strong>Status:</strong> ${caseData.existing ? 'Existing' : 'New'}</p>
+                <p><strong>Message:</strong> ${caseData.message}</p>
+                
+                <div class="case-details">
+📊 CASE DETAILS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🆔 Case ID: ${caseData.case.id}
+🌐 URL: ${caseData.case.url || 'N/A'}
+📄 File Hash: ${caseData.case.file_hash || 'N/A'}
+📝 Description: ${caseData.case.description}
+📊 State: ${caseData.case.state}
+📅 Created: ${new Date(caseData.case.created_at).toLocaleString()}
+⏰ Due By: ${new Date(caseData.case.due_by).toLocaleString()}
+👤 Submitter: ${caseData.case.submitter_id}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                </div>
+            `;
+            
+            caseResults.appendChild(resultDiv);
+        }
+
+        // Logout
+        logoutBtn.addEventListener('click', () => {
+            currentToken = null;
+            currentUser = null;
+            updateUI();
+            statusContainer.innerHTML = '';
+            caseResults.innerHTML = '';
+            showStatus('👋 Logged out successfully', 'info');
+        });
+
+        // Officer Dashboard Functionality
+        document.addEventListener('DOMContentLoaded', () => {
+            const loadCasesBtn = document.getElementById('loadCasesBtn');
+            const loadAllCasesBtn = document.getElementById('loadAllCasesBtn');
+            
+            if (loadCasesBtn) {
+                loadCasesBtn.addEventListener('click', async () => {
+                    showStatus('Loading open cases...', 'info');
+                    document.getElementById('casesContainer').innerHTML = 
+                        '<p style="color: #60a5fa; text-align: center; padding: 20px;">🔄 Loading cases...</p>';
+                    
+                    // Simulate loading cases (you would implement actual API call here)
+                    setTimeout(() => {
+                        document.getElementById('casesContainer').innerHTML = `
+                            <div style="color: #94a3b8; padding: 20px; text-align: center;">
+                                <h4 style="color: #60a5fa;">📋 Open Cases</h4>
+                                <p>No open cases requiring review at this time.</p>
+                                <small>This would show actual cases from the database in a real implementation.</small>
+                            </div>
+                        `;
+                        showStatus('✅ Cases loaded', 'success');
+                    }, 1000);
+                });
+            }
+        });
+
+        // Initialize UI
+        updateUI();
+
+        // Show welcome message
+        showStatus('🛡️ Welcome to Take It Down! Please login or register to report harmful content.', 'info');
+    </script>
+</body>
+</html>
