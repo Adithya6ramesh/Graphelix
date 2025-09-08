@@ -90,3 +90,24 @@ class CaseDetailResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class CaseListResponse(BaseModel):
+    """Response model for case list"""
+    cases: list[CaseResponse]
+    total: int
+    page: int
+    limit: int
+    has_more: bool
+    
+    class Config:
+        from_attributes = True
+
+
+class CaseUpdateRequest(BaseModel):
+    """Request model for case updates"""
+    state: str
+    note: Optional[str] = None
+    
+    class Config:
+        from_attributes = True

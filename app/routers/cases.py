@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Header
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from typing import Optional
 from app.database import get_db
 from app.auth import get_current_user, require_role
 from app.models import User, UserRole, Case, CaseEvent
@@ -10,10 +11,12 @@ from app.schemas.case import (
     CaseSubmissionResponse, 
     CaseResponse,
     CaseDetailResponse,
-    CaseEventResponse
+    CaseEventResponse,
+    CaseListResponse,
+    CaseUpdateRequest
 )
 from app.services.deduplication import DeduplicationService
-from typing import Optional
+from typing import Optional, List
 import time
 import asyncio
 
@@ -117,6 +120,104 @@ async def submit_case(
         )
 
 
+@router.get("/my-cases", response_model=CaseListResponse)
+async def get_my_cases(
+    page: int = 1,
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get cases submitted by the current user"""
+    # Calculate offset
+    offset = (page - 1) * limit
+    
+    # Get cases for the current user
+    cases_query = (
+        select(Case)
+        .where(Case.submitter_id == current_user.id)
+        .order_by(Case.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    
+    cases_result = await db.execute(cases_query)
+    cases = cases_result.scalars().all()
+    
+    # Get total count
+    count_query = select(func.count(Case.id)).where(Case.submitter_id == current_user.id)
+    count_result = await db.execute(count_query)
+    total_cases = count_result.scalar()
+    
+    # Convert to response models
+    case_responses = [CaseResponse.model_validate(case) for case in cases]
+    
+    return CaseListResponse(
+        cases=case_responses,
+        total=total_cases,
+        page=page,
+        limit=limit,
+        has_more=(offset + len(cases)) < total_cases
+    )
+
+
+@router.get("/all", response_model=CaseListResponse)
+async def get_all_cases(
+    page: int = 1,
+    limit: int = 10,
+    state: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all cases for officers and admins"""
+    # Only officers and admins can view all cases
+    if current_user.role == UserRole.VICTIM:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to view all cases"
+        )
+    
+    # Calculate offset
+    offset = (page - 1) * limit
+    
+    # Build query
+    query = select(Case).order_by(Case.created_at.desc())
+    
+    # Filter by state if provided
+    if state:
+        from app.models.case import CaseState
+        try:
+            case_state = CaseState(state.lower())
+            query = query.where(Case.state == case_state)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid state: {state}"
+            )
+    
+    # Apply pagination
+    cases_query = query.offset(offset).limit(limit)
+    cases_result = await db.execute(cases_query)
+    cases = cases_result.scalars().all()
+    
+    # Get total count
+    count_query = select(func.count(Case.id))
+    if state:
+        count_query = count_query.where(Case.state == case_state)
+    count_result = await db.execute(count_query)
+    total_cases = count_result.scalar()
+    
+    # Convert to response models
+    case_responses = [CaseResponse.model_validate(case) for case in cases]
+    
+    return CaseListResponse(
+        cases=case_responses,
+        total=total_cases,
+        page=page,
+        limit=limit,
+        has_more=(offset + len(cases)) < total_cases
+    )
+
+
 @router.get("/{case_id}", response_model=CaseDetailResponse)
 async def get_case(
     case_id: str,
@@ -176,3 +277,108 @@ async def get_case(
         events=event_responses,
         total_events=total_events
     )
+
+
+@router.get("/my-cases", response_model=CaseListResponse)
+async def get_my_cases(
+    page: int = 1,
+    limit: int = 10,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get cases submitted by the current user"""
+    # Calculate offset
+    offset = (page - 1) * limit
+    
+    # Get cases for the current user
+    cases_query = (
+        select(Case)
+        .where(Case.submitter_id == current_user.id)
+        .order_by(Case.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    
+    cases_result = await db.execute(cases_query)
+    cases = cases_result.scalars().all()
+    
+    # Get total count
+    count_query = select(func.count(Case.id)).where(Case.submitter_id == current_user.id)
+    count_result = await db.execute(count_query)
+    total_cases = count_result.scalar()
+    
+    # Convert to response models
+    case_responses = [CaseResponse.model_validate(case) for case in cases]
+    
+    return CaseListResponse(
+        cases=case_responses,
+        total=total_cases,
+        page=page,
+        limit=limit,
+        has_more=(offset + len(cases)) < total_cases
+    )
+
+@router.put("/{case_id}/status", response_model=CaseResponse)
+async def update_case_status(
+    case_id: str,
+    update_request: CaseUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Update case status (officers and admins only)"""
+    # Only officers and admins can update case status
+    if current_user.role == UserRole.VICTIM:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to update case status"
+        )
+    
+    # Get the case
+    case_query = select(Case).where(Case.id == case_id)
+    case_result = await db.execute(case_query)
+    case = case_result.scalar_one_or_none()
+    
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Case not found"
+        )
+    
+    # Validate state transition
+    from app.models.case import CaseState
+    try:
+        new_state = CaseState(update_request.state.lower())
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid state: {update_request.state}"
+        )
+    
+    # Update case state
+    old_state = case.state
+    case.state = new_state
+    
+    # Create event for the status change
+    from app.models.case_event import CaseEvent
+    import uuid
+    event_metadata = {
+        "old_state": old_state.value if old_state else None,
+        "new_state": new_state.value
+    }
+    if update_request.note:
+        event_metadata["note"] = update_request.note
+    
+    event = CaseEvent(
+        id=str(uuid.uuid4()),
+        case_id=case_id,
+        actor_id=current_user.id,
+        actor_role=current_user.role.value,
+        action="STATUS_CHANGE",
+        event_metadata=event_metadata
+    )
+    
+    db.add(event)
+    await db.commit()
+    await db.refresh(case)
+    
+    return CaseResponse.model_validate(case)

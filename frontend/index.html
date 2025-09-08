@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Take It Down - Report Harmful Content</title>
+    <title>Graphelix - Report Harmful Content</title>
     <style>
         * {
             margin: 0;
@@ -219,6 +219,56 @@
             box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
         }
 
+        .case-item {
+            background: linear-gradient(135deg, #1e293b, #334155);
+            border: 1px solid #475569;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .case-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+        }
+
+        .case-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .case-status.pending {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: #fef3c7;
+        }
+
+        .case-status.under-review {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: #dbeafe;
+        }
+
+        .case-status.resolved {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #d1fae5;
+        }
+
+        .case-status.rejected {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #fee2e2;
+        }
+
+        .case-meta {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
         .user-info {
             background: linear-gradient(135deg, #0c4a6e, #0369a1);
             border: 2px solid #0ea5e9;
@@ -269,7 +319,7 @@
             <div class="auth-section">
                 <!-- Login Form -->
                 <div id="loginFormContainer" class="auth-form">
-                    <h3>🔑 Login</h3>
+                    <h3> Login</h3>
                     <form id="loginForm">
                         <div class="form-group">
                             <label for="loginEmail">Username:</label>
@@ -301,9 +351,9 @@
                         <div class="form-group">
                             <label for="registerRole">Role:</label>
                             <select id="registerRole" required>
-                                <option value="victim">🙋‍♀️ Victim (Report Content)</option>
-                                <option value="officer">👮‍♀️ Officer (Review Cases)</option>
-                                <option value="admin">👑 Admin (Manage System)</option>
+                                <option value="victim"> Victim (Report Content)</option>
+                                <option value="officer"> Officer (Review Cases)</option>
+                                <option value="admin"> Admin (Manage System)</option>
                             </select>
                         </div>
                         <button type="submit" class="btn">Register</button>
@@ -342,17 +392,31 @@
                     <textarea id="description" rows="4" placeholder="Describe why this content is harmful and should be removed..."></textarea>
                 </div>
 
-                <button type="submit" class="btn">🚨 Submit Report</button>
+                <button type="submit" class="btn"> Submit Report</button>
             </form>
+        </div>
+
+        <!-- Case History Section (Victims only) -->
+        <div id="caseHistorySection" class="card hidden">
+            <h3 style="color: #60a5fa; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">📋 My Submitted Cases</h3>
+            <p style="color: #94a3b8; margin-bottom: 20px;">Track the status of your reported content</p>
+            
+            <div style="margin-bottom: 20px;">
+                <button id="loadMyCasesBtn" class="btn"> Refresh My Cases</button>
+            </div>
+            
+            <div id="myCasesContainer">
+                <p style="color: #64748b; text-align: center; padding: 20px;">Loading your cases...</p>
+            </div>
         </div>
 
         <!-- Officer Dashboard -->
         <div id="officerSection" class="card hidden">
-            <h3 style="color: #60a5fa; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">👮‍♀️ Officer Dashboard</h3>
+            <h3 style="color: #60a5fa; text-shadow: 0 2px 4px rgba(0,0,0,0.5);"> Officer Dashboard</h3>
             <p style="color: #94a3b8; margin-bottom: 20px;">Review and manage submitted cases</p>
             
             <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                <button id="loadCasesBtn" class="btn">📋 Load Open Cases</button>
+                <button id="loadCasesBtn" class="btn">📋 Load New Cases</button>
                 <button id="loadAllCasesBtn" class="btn">📊 Load All Cases</button>
             </div>
             
@@ -367,9 +431,9 @@
             <p style="color: #94a3b8; margin-bottom: 20px;">System administration and oversight</p>
             
             <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
-                <button id="adminLoadCasesBtn" class="btn">📋 All Cases</button>
-                <button id="systemStatsBtn" class="btn">📊 System Stats</button>
-                <button id="userManagementBtn" class="btn">👥 User Management</button>
+                <button id="adminLoadCasesBtn" class="btn"> All Cases</button>
+                <button id="systemStatsBtn" class="btn"> System Stats</button>
+                <button id="userManagementBtn" class="btn"> User Management</button>
             </div>
             
             <div id="adminContainer">
@@ -393,16 +457,21 @@
         const authSection = document.getElementById('authSection');
         const userInfo = document.getElementById('userInfo');
         const caseSection = document.getElementById('caseSection');
+        const caseHistorySection = document.getElementById('caseHistorySection');
         const officerSection = document.getElementById('officerSection');
         const adminSection = document.getElementById('adminSection');
         const statusContainer = document.getElementById('statusContainer');
         const caseResults = document.getElementById('caseResults');
 
-        // Forms
+        // Forms and buttons
         const loginForm = document.getElementById('loginForm');
         const registerForm = document.getElementById('registerForm');
         const caseForm = document.getElementById('caseForm');
         const logoutBtn = document.getElementById('logoutBtn');
+        const loadMyCasesBtn = document.getElementById('loadMyCasesBtn');
+
+        // Containers
+        const myCasesContainer = document.getElementById('myCasesContainer');
 
         // Auth toggle elements
         const loginFormContainer = document.getElementById('loginFormContainer');
@@ -440,6 +509,7 @@
                 
                 // Hide all role-specific sections first
                 caseSection.classList.add('hidden');
+                caseHistorySection.classList.add('hidden');
                 officerSection.classList.add('hidden');
                 adminSection.classList.add('hidden');
                 
@@ -447,6 +517,8 @@
                 switch(currentUser.role) {
                     case 'victim':
                         caseSection.classList.remove('hidden');
+                        caseHistorySection.classList.remove('hidden');
+                        loadMyCases(); // Auto-load cases when victim logs in
                         break;
                     case 'officer':
                         officerSection.classList.remove('hidden');
@@ -462,6 +534,7 @@
                 authSection.classList.remove('hidden');
                 userInfo.classList.add('hidden');
                 caseSection.classList.add('hidden');
+                caseHistorySection.classList.add('hidden');
                 officerSection.classList.add('hidden');
                 adminSection.classList.add('hidden');
             }
@@ -590,6 +663,11 @@
                 displayCaseResult(result.data, statusCode);
                 caseForm.reset();
                 
+                // Refresh user's cases list if they're a victim
+                if (currentUser && currentUser.role === 'victim') {
+                    loadMyCases();
+                }
+                
             } catch (error) {
                 showStatus(`❌ Case submission failed: ${error.message}`, 'error');
             }
@@ -609,7 +687,7 @@
                 <p><strong>Message:</strong> ${caseData.message}</p>
                 
                 <div class="case-details">
-📊 CASE DETAILS:
+ CASE DETAILS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🆔 Case ID: ${caseData.case.id}
 🌐 URL: ${caseData.case.url || 'N/A'}
@@ -626,6 +704,216 @@
             caseResults.appendChild(resultDiv);
         }
 
+        // Load user's cases function
+        async function loadMyCases() {
+            try {
+                showStatus('Loading your cases...', 'info');
+                
+                const result = await apiCall('/api/cases/my-cases', {
+                    method: 'GET'
+                });
+
+                displayMyCases(result.data);
+                
+            } catch (error) {
+                showStatus(`❌ Failed to load cases: ${error.message}`, 'error');
+                myCasesContainer.innerHTML = '<p style="color: #ef4444; text-align: center; padding: 20px;">Failed to load cases. Please try again.</p>';
+            }
+        }
+
+        // Display user's cases
+        function displayMyCases(casesData) {
+            if (!casesData.cases || casesData.cases.length === 0) {
+                myCasesContainer.innerHTML = '<p style="color: #64748b; text-align: center; padding: 20px;">No cases submitted yet. Submit your first report above!</p>';
+                return;
+            }
+
+            const casesHtml = casesData.cases.map(caseItem => {
+                const statusClass = caseItem.state.toLowerCase().replace('_', '-');
+                const createdDate = new Date(caseItem.created_at).toLocaleDateString();
+                const createdTime = new Date(caseItem.created_at).toLocaleTimeString();
+                
+                return `
+                    <div class="case-item">
+                        <div style="display: flex; justify-content: between; align-items: flex-start; margin-bottom: 10px;">
+                            <div style="flex: 1;">
+                                <h4 style="color: #60a5fa; margin: 0 0 5px 0;">Case #${caseItem.id.slice(-8)}</h4>
+                                <span class="case-status ${statusClass}">${caseItem.state.replace('_', ' ')}</span>
+                            </div>
+                            <div class="case-meta" style="text-align: right;">
+                                <div>${createdDate}</div>
+                                <div>${createdTime}</div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin: 15px 0;">
+                            ${caseItem.url ? `<p><strong>URL:</strong> <span style="color: #22d3ee; word-break: break-all;">${caseItem.url}</span></p>` : ''}
+                            ${caseItem.file_hash ? `<p><strong>File Hash:</strong> <span style="color: #22d3ee; font-family: monospace;">${caseItem.file_hash}</span></p>` : ''}
+                            <p><strong>Description:</strong> ${caseItem.description}</p>
+                        </div>
+                        
+                        <div class="case-meta">
+                            <div>Created: ${createdDate} at ${createdTime}</div>
+                            ${caseItem.due_by ? `<div>Due: ${new Date(caseItem.due_by).toLocaleDateString()}</div>` : ''}
+                            ${caseItem.assigned_officer_id ? `<div>Assigned Officer: ${caseItem.assigned_officer_id}</div>` : '<div>No officer assigned yet</div>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            myCasesContainer.innerHTML = `
+                <div style="margin-bottom: 15px; color: #94a3b8;">
+                    Showing ${casesData.cases.length} of ${casesData.total} cases
+                    ${casesData.has_more ? ` • <a href="#" style="color: #60a5fa;">Load more</a>` : ''}
+                </div>
+                ${casesHtml}
+            `;
+        }
+
+        // Load cases for officers
+        async function loadOfficerCases(state = null) {
+            try {
+                const statusMsg = state ? `Loading ${state.toLowerCase()} cases...` : 'Loading all cases...';
+                showStatus(statusMsg, 'info');
+                
+                const casesContainer = document.getElementById('casesContainer');
+                casesContainer.innerHTML = '<p style="color: #60a5fa; text-align: center; padding: 20px;">🔄 Loading cases...</p>';
+                
+                let endpoint = '/api/cases/all';
+                if (state) {
+                    endpoint += `?state=${state}`;
+                }
+                
+                const result = await apiCall(endpoint, {
+                    method: 'GET'
+                });
+
+                displayOfficerCases(result.data, state);
+                
+            } catch (error) {
+                showStatus(`❌ Failed to load cases: ${error.message}`, 'error');
+                document.getElementById('casesContainer').innerHTML = 
+                    '<p style="color: #ef4444; text-align: center; padding: 20px;">Failed to load cases. Please try again.</p>';
+            }
+        }
+
+        // Display cases for officers
+        function displayOfficerCases(casesData, filterState = null) {
+            const casesContainer = document.getElementById('casesContainer');
+            
+            if (!casesData.cases || casesData.cases.length === 0) {
+                const message = filterState ? 
+                    `No ${filterState.toLowerCase()} cases found.` : 
+                    'No cases found in the system.';
+                casesContainer.innerHTML = `<p style="color: #64748b; text-align: center; padding: 20px;">${message}</p>`;
+                return;
+            }
+
+            const casesHtml = casesData.cases.map(caseItem => {
+                const statusClass = caseItem.state.toLowerCase().replace('_', '-');
+                const createdDate = new Date(caseItem.created_at).toLocaleDateString();
+                const createdTime = new Date(caseItem.created_at).toLocaleTimeString();
+                
+                return `
+                    <div class="case-item">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                            <div style="flex: 1;">
+                                <h4 style="color: #60a5fa; margin: 0 0 5px 0;">Case #${caseItem.id.slice(-8)}</h4>
+                                <p style="color: #94a3b8; margin: 0; font-size: 0.9em;">
+                                    Submitted: ${createdDate} at ${createdTime}
+                                </p>
+                            </div>
+                            <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 10px;">
+                                <span class="status-badge status-${statusClass}">${caseItem.state}</span>
+                                <div style="display: flex; gap: 10px;">
+                                    <button onclick="updateCaseStatus('${caseItem.id}', 'in_review')" 
+                                            class="btn" style="padding: 5px 10px; font-size: 0.8em;">
+                                        📋 Review
+                                    </button>
+                                    <button onclick="updateCaseStatus('${caseItem.id}', 'approved')" 
+                                            class="btn" style="padding: 5px 10px; font-size: 0.8em; background: #16a34a;">
+                                        ✅ Approve
+                                    </button>
+                                    <button onclick="updateCaseStatus('${caseItem.id}', 'rejected')" 
+                                            class="btn" style="padding: 5px 10px; font-size: 0.8em; background: #dc2626;">
+                                        ❌ Reject
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="background: rgba(30, 41, 59, 0.8); padding: 15px; border-radius: 8px; margin-top: 10px;">
+                            <div style="margin-bottom: 10px;">
+                                <strong style="color: #60a5fa;">Content Type:</strong> 
+                                <span style="color: #e2e8f0;">${caseItem.content_type}</span>
+                            </div>
+                            <div style="margin-bottom: 10px;">
+                                <strong style="color: #60a5fa;">Description:</strong>
+                                <p style="color: #cbd5e1; margin: 5px 0 0 0; line-height: 1.5;">${caseItem.description}</p>
+                            </div>
+                            ${caseItem.content_url ? `
+                                <div style="margin-bottom: 10px;">
+                                    <strong style="color: #60a5fa;">Content URL:</strong>
+                                    <a href="${caseItem.content_url}" target="_blank" style="color: #38bdf8; text-decoration: none;">
+                                        ${caseItem.content_url}
+                                    </a>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            casesContainer.innerHTML = `
+                <div style="margin-bottom: 15px; color: #94a3b8;">
+                    Showing ${casesData.cases.length} of ${casesData.total} cases
+                    ${filterState ? ` (${filterState} only)` : ''}
+                    ${casesData.has_more ? ` • <a href="#" style="color: #60a5fa;">Load more</a>` : ''}
+                </div>
+                ${casesHtml}
+            `;
+            
+            showStatus(`✅ Loaded ${casesData.cases.length} cases`, 'success');
+        }
+
+        // Update case status (for officers)
+        async function updateCaseStatus(caseId, newStatus) {
+            try {
+                showStatus(`Updating case status to ${newStatus}...`, 'info');
+                
+                const result = await apiCall(`/api/cases/${caseId}/status`, {
+                    method: 'PUT',
+                    body: JSON.stringify({
+                        state: newStatus,
+                        note: `Status updated by officer`
+                    })
+                });
+
+                showStatus(`✅ Case status updated to ${newStatus}`, 'success');
+                
+                // Reload the current view
+                const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+                if (currentUser.role === 'officer') {
+                    // Determine what filter was applied and reload
+                    const casesContainer = document.getElementById('casesContainer');
+                    const filterText = casesContainer.innerHTML;
+                    
+                    if (filterText.includes('(submitted only)')) {
+                        await loadOfficerCases('submitted');
+                    } else {
+                        await loadOfficerCases();
+                    }
+                }
+                
+            } catch (error) {
+                showStatus(`❌ Failed to update case: ${error.message}`, 'error');
+            }
+        }
+
+        // Event listener for refresh button
+        loadMyCasesBtn.addEventListener('click', () => {
+            loadMyCases();
+        });
+
         // Logout
         logoutBtn.addEventListener('click', () => {
             currentToken = null;
@@ -633,7 +921,7 @@
             updateUI();
             statusContainer.innerHTML = '';
             caseResults.innerHTML = '';
-            showStatus('👋 Logged out successfully', 'info');
+            showStatus(' Logged out successfully', 'info');
         });
 
         // Officer Dashboard Functionality
@@ -643,21 +931,13 @@
             
             if (loadCasesBtn) {
                 loadCasesBtn.addEventListener('click', async () => {
-                    showStatus('Loading open cases...', 'info');
-                    document.getElementById('casesContainer').innerHTML = 
-                        '<p style="color: #60a5fa; text-align: center; padding: 20px;">🔄 Loading cases...</p>';
-                    
-                    // Simulate loading cases (you would implement actual API call here)
-                    setTimeout(() => {
-                        document.getElementById('casesContainer').innerHTML = `
-                            <div style="color: #94a3b8; padding: 20px; text-align: center;">
-                                <h4 style="color: #60a5fa;">📋 Open Cases</h4>
-                                <p>No open cases requiring review at this time.</p>
-                                <small>This would show actual cases from the database in a real implementation.</small>
-                            </div>
-                        `;
-                        showStatus('✅ Cases loaded', 'success');
-                    }, 1000);
+                    await loadOfficerCases('submitted');
+                });
+            }
+            
+            if (loadAllCasesBtn) {
+                loadAllCasesBtn.addEventListener('click', async () => {
+                    await loadOfficerCases();
                 });
             }
         });
@@ -666,7 +946,7 @@
         updateUI();
 
         // Show welcome message
-        showStatus('🛡️ Welcome to Take It Down! Please login or register to report harmful content.', 'info');
+        showStatus(' Welcome to Take It Down! Please login or register to report harmful content.', 'info');
     </script>
 </body>
 </html>
