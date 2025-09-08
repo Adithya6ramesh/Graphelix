@@ -1,4 +1,4 @@
-# 🛡️ Take It Down - Harmful Content Reporting System
+# 🛡️ Graphelix - Harmful Content Reporting System
 
 A comprehensive web application for reporting and managing harmful online content, built with FastAPI and modern web technologies.
 
