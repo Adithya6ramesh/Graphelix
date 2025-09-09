@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db, init_db
 from app.auth import get_current_user, create_access_token, verify_password, get_password_hash
 from app.models.user import User, UserRole
-from app.routers import cases
+from app.routers import cases, admin
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from datetime import datetime
@@ -24,6 +24,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(cases.router)
+app.include_router(admin.router)
 
 # Pydantic models for requests/responses
 class UserCreate(BaseModel):
@@ -58,6 +59,13 @@ class UserResponse(BaseModel):
 async def startup_event():
     """Initialize database on startup"""
     await init_db()
+    print("🚀 Take It Down API server started successfully!")
+    print("📋 Workflow features: State transitions, SLA tracking, Auto-escalation")
+    
+    # Start automation service in background (uncomment for production)
+    # import asyncio
+    # from app.automation import start_automation_service
+    # asyncio.create_task(start_automation_service())
 
 
 @app.post("/api/auth/register", response_model=UserResponse)
@@ -99,17 +107,6 @@ async def login(user_data: UserLogin, db: AsyncSession = Depends(get_db)):
     
     access_token = create_access_token(data={"sub": str(user.id)})
     return {"access_token": access_token, "token_type": "bearer"}
-
-
-@app.get("/api/auth/me")
-async def get_current_user_info(current_user: User = Depends(get_current_user)):
-    """Get current user information"""
-    return {
-        "id": current_user.id,
-        "email": current_user.email,
-        "role": current_user.role.value,
-        "created_at": current_user.created_at
-    }
 
 
 @app.get("/api/auth/me", response_model=UserResponse)

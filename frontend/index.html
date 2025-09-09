@@ -929,6 +929,11 @@
             const loadCasesBtn = document.getElementById('loadCasesBtn');
             const loadAllCasesBtn = document.getElementById('loadAllCasesBtn');
             
+            // Admin buttons
+            const adminLoadCasesBtn = document.getElementById('adminLoadCasesBtn');
+            const systemStatsBtn = document.getElementById('systemStatsBtn');
+            const userManagementBtn = document.getElementById('userManagementBtn');
+            
             if (loadCasesBtn) {
                 loadCasesBtn.addEventListener('click', async () => {
                     await loadOfficerCases('submitted');
@@ -940,7 +945,252 @@
                     await loadOfficerCases();
                 });
             }
+
+            // Admin functionality
+            if (adminLoadCasesBtn) {
+                adminLoadCasesBtn.addEventListener('click', async () => {
+                    await loadAdminCases();
+                });
+            }
+
+            if (systemStatsBtn) {
+                systemStatsBtn.addEventListener('click', async () => {
+                    await loadSystemStats();
+                });
+            }
+
+            if (userManagementBtn) {
+                userManagementBtn.addEventListener('click', async () => {
+                    await loadUserManagement();
+                });
+            }
         });
+
+        // Admin Functions
+        async function loadAdminCases() {
+            if (!currentToken) {
+                showStatus('❌ Please login first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8000/api/admin/cases/recent?limit=100', {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const cases = await response.json();
+                displayAdminCases(cases);
+                showStatus(`📋 Loaded ${cases.length} recent cases`, 'success');
+            } catch (error) {
+                showStatus(`❌ Failed to load cases: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadSystemStats() {
+            if (!currentToken) {
+                showStatus('❌ Please login first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8000/api/admin/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const stats = await response.json();
+                displaySystemStats(stats);
+                showStatus('📊 System statistics loaded', 'success');
+            } catch (error) {
+                showStatus(`❌ Failed to load stats: ${error.message}`, 'error');
+            }
+        }
+
+        async function loadUserManagement() {
+            if (!currentToken) {
+                showStatus('❌ Please login first', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:8000/api/admin/users', {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const users = await response.json();
+                displayUserManagement(users);
+                showStatus(`👥 Loaded ${users.length} users`, 'success');
+            } catch (error) {
+                showStatus(`❌ Failed to load users: ${error.message}`, 'error');
+            }
+        }
+
+        function displayAdminCases(cases) {
+            const adminContainer = document.getElementById('adminContainer');
+            
+            if (cases.length === 0) {
+                adminContainer.innerHTML = '<p style="color: #64748b; text-align: center;">No cases found</p>';
+                return;
+            }
+
+            const casesHtml = cases.map(caseItem => {
+                const overdueClass = caseItem.overdue ? 'style="background-color: #fee2e2; border: 1px solid #fca5a5;"' : '';
+                const overdueIcon = caseItem.overdue ? '⚠️ ' : '';
+                
+                return `
+                    <div class="case-item" ${overdueClass}>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>${overdueIcon}Case #${caseItem.id}</strong>
+                                <p style="margin: 5px 0; color: #64748b; font-size: 14px;">
+                                    ${caseItem.url}
+                                </p>
+                                <p style="margin: 5px 0; color: #64748b; font-size: 12px;">
+                                    Created: ${new Date(caseItem.created_at).toLocaleString()}
+                                    ${caseItem.due_by ? `| Due: ${new Date(caseItem.due_by).toLocaleString()}` : ''}
+                                </p>
+                            </div>
+                            <div style="text-align: right;">
+                                <span class="status-badge status-${caseItem.state.toLowerCase()}">${caseItem.state}</span>
+                                <p style="margin: 5px 0; color: #64748b; font-size: 12px;">
+                                    User: ${caseItem.creator_id} | Assigned: ${caseItem.assigned_to || 'None'}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            adminContainer.innerHTML = `
+                <h4 style="color: #e2e8f0; margin-bottom: 15px;">Recent Cases (${cases.length})</h4>
+                <div style="max-height: 500px; overflow-y: auto;">
+                    ${casesHtml}
+                </div>
+            `;
+        }
+
+        function displaySystemStats(stats) {
+            const adminContainer = document.getElementById('adminContainer');
+            
+            const userRoleStats = Object.entries(stats.users.by_role)
+                .map(([role, count]) => `<li>${role}: ${count}</li>`)
+                .join('');
+            
+            const caseStateStats = Object.entries(stats.cases.by_state)
+                .map(([state, count]) => `<li>${state}: ${count}</li>`)
+                .join('');
+
+            adminContainer.innerHTML = `
+                <h4 style="color: #e2e8f0; margin-bottom: 15px;">📊 System Statistics</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                    <div style="background: #1e293b; padding: 15px; border-radius: 8px;">
+                        <h5 style="color: #60a5fa; margin-bottom: 10px;">👥 Users</h5>
+                        <p>Total: <strong>${stats.users.total}</strong></p>
+                        <p>New (24h): <strong>${stats.users.recent_24h}</strong></p>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            ${userRoleStats}
+                        </ul>
+                    </div>
+                    <div style="background: #1e293b; padding: 15px; border-radius: 8px;">
+                        <h5 style="color: #60a5fa; margin-bottom: 10px;">📋 Cases</h5>
+                        <p>Total: <strong>${stats.cases.total}</strong></p>
+                        <p>New (24h): <strong>${stats.cases.recent_24h}</strong></p>
+                        <p>Overdue: <strong style="color: #f87171;">${stats.cases.overdue}</strong></p>
+                        <p>Avg Resolution: <strong>${stats.cases.avg_resolution_hours || 'N/A'} hours</strong></p>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            ${caseStateStats}
+                        </ul>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; padding: 10px; background: #0f172a; border-radius: 6px;">
+                    <small style="color: #64748b;">Last updated: ${new Date(stats.system.generated_at).toLocaleString()}</small>
+                </div>
+            `;
+        }
+
+        function displayUserManagement(users) {
+            const adminContainer = document.getElementById('adminContainer');
+            
+            const usersHtml = users.map(user => {
+                const roleClass = user.role === 'admin' ? 'style="color: #fbbf24;"' : 
+                                 user.role === 'officer' ? 'style="color: #60a5fa;"' : '';
+                
+                return `
+                    <div class="case-item">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <strong>${user.email}</strong>
+                                <p style="margin: 5px 0; color: #64748b; font-size: 12px;">
+                                    ID: ${user.id} | Joined: ${new Date(user.created_at).toLocaleString()}
+                                </p>
+                            </div>
+                            <div style="text-align: right;">
+                                <span ${roleClass}><strong>${user.role.toUpperCase()}</strong></span>
+                                <div style="margin-top: 5px;">
+                                    <select onchange="updateUserRole('${user.id}', this.value)" style="padding: 4px; border-radius: 4px; background: #374151; color: #e2e8f0; border: 1px solid #4b5563;">
+                                        <option value="">Change Role...</option>
+                                        <option value="victim">Victim</option>
+                                        <option value="officer">Officer</option>
+                                        <option value="admin">Admin</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            adminContainer.innerHTML = `
+                <h4 style="color: #e2e8f0; margin-bottom: 15px;">👥 User Management (${users.length})</h4>
+                <div style="max-height: 500px; overflow-y: auto;">
+                    ${usersHtml}
+                </div>
+            `;
+        }
+
+        async function updateUserRole(userId, newRole) {
+            if (!newRole || !currentToken) return;
+            
+            try {
+                const response = await fetch(`http://localhost:8000/api/admin/users/${userId}/role`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ role: newRole })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                showStatus(`✅ ${result.message}`, 'success');
+                
+                // Reload user management to reflect changes
+                await loadUserManagement();
+            } catch (error) {
+                showStatus(`❌ Failed to update role: ${error.message}`, 'error');
+            }
+        }
 
         // Initialize UI
         updateUI();

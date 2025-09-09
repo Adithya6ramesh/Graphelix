@@ -90,3 +90,23 @@ def require_role(*allowed_roles: UserRole):
             return await func(*args, **kwargs)
         return wrapper
     return decorator
+
+
+async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+    """Dependency to require admin role"""
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return current_user
+
+
+async def require_officer(current_user: User = Depends(get_current_user)) -> User:
+    """Dependency to require officer or admin role"""
+    if current_user.role not in [UserRole.OFFICER, UserRole.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Officer or Admin access required"
+        )
+    return current_user

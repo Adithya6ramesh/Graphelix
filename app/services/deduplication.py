@@ -2,6 +2,7 @@ from typing import Optional, Tuple, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from app.models import Case, DedupIndex, IdempotencyKey, CaseEvent, User
+from app.models.case import CaseState
 from app.services.normalization import URLNormalizer
 from datetime import datetime, timedelta
 from app.config import settings
@@ -109,7 +110,10 @@ class DeduplicationService:
             return existing_case, False
         
         # Create new case
-        due_by = datetime.utcnow() + timedelta(hours=settings.sla_hours)
+        # Calculate SLA deadline using workflow manager
+        from app.workflow import CaseWorkflowManager
+        workflow_manager = CaseWorkflowManager(self.db)
+        due_by = workflow_manager.calculate_sla_deadline(CaseState.SUBMITTED)
         
         new_case = Case(
             submitter_id=submitter.id,

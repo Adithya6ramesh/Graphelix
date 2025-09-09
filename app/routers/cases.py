@@ -16,6 +16,8 @@ from app.schemas.case import (
     CaseUpdateRequest
 )
 from app.services.deduplication import DeduplicationService
+from app.workflow import CaseWorkflowManager
+from app.models.case import CaseState
 from typing import Optional, List
 import time
 import asyncio
@@ -344,8 +346,7 @@ async def update_case_status(
             detail="Case not found"
         )
     
-    # Validate state transition
-    from app.models.case import CaseState
+    # Validate state transition using workflow manager
     try:
         new_state = CaseState(update_request.state.lower())
     except ValueError:
@@ -354,31 +355,100 @@ async def update_case_status(
             detail=f"Invalid state: {update_request.state}"
         )
     
-    # Update case state
-    old_state = case.state
-    case.state = new_state
+    # Use workflow manager for state transition
+    workflow_manager = CaseWorkflowManager(db)
     
-    # Create event for the status change
-    from app.models.case_event import CaseEvent
-    import uuid
-    event_metadata = {
-        "old_state": old_state.value if old_state else None,
-        "new_state": new_state.value
+    try:
+        # Check if transition is allowed
+        can_transition, reason = await workflow_manager.can_transition(case, new_state, current_user)
+        
+        if not can_transition:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Transition not allowed: {reason}"
+            )
+        
+        # Perform the transition
+        await workflow_manager.transition_case(case, new_state, current_user, update_request.note)
+        
+        await db.refresh(case)
+        return CaseResponse.model_validate(case)
+        
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+
+@router.get("/{case_id}/transitions")
+async def get_available_transitions(
+    case_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get available state transitions for a case"""
+    # Get the case
+    case_query = select(Case).where(Case.id == case_id)
+    case_result = await db.execute(case_query)
+    case = case_result.scalar_one_or_none()
+    
+    if not case:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Case not found"
+        )
+    
+    # Check permissions
+    if (current_user.role == UserRole.VICTIM and 
+        case.submitter_id != current_user.id):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only view your own cases"
+        )
+    
+    workflow_manager = CaseWorkflowManager(db)
+    transitions = workflow_manager.get_available_transitions(case, current_user)
+    
+    return {
+        "case_id": case_id,
+        "current_state": case.state.value,
+        "available_transitions": transitions
     }
-    if update_request.note:
-        event_metadata["note"] = update_request.note
+
+
+@router.get("/workflow/metrics")
+async def get_workflow_metrics(
+    current_user: User = Depends(require_role(UserRole.OFFICER)),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get workflow metrics and statistics"""
+    workflow_manager = CaseWorkflowManager(db)
+    metrics = await workflow_manager.get_workflow_metrics()
     
-    event = CaseEvent(
-        id=str(uuid.uuid4()),
-        case_id=case_id,
-        actor_id=current_user.id,
-        actor_role=current_user.role.value,
-        action="STATUS_CHANGE",
-        event_metadata=event_metadata
-    )
+    return {
+        "metrics": metrics,
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+@router.get("/workflow/overdue")
+async def get_overdue_cases(
+    current_user: User = Depends(require_role(UserRole.OFFICER)),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get cases that are past their SLA deadline"""
+    workflow_manager = CaseWorkflowManager(db)
+    overdue_cases = await workflow_manager.get_overdue_cases()
     
-    db.add(event)
-    await db.commit()
-    await db.refresh(case)
+    case_responses = [CaseResponse.model_validate(case) for case in overdue_cases]
     
-    return CaseResponse.model_validate(case)
+    return {
+        "overdue_cases": case_responses,
+        "count": len(case_responses),
+        "timestamp": datetime.utcnow().isoformat()
+    }
+
+
+# Import datetime for the new endpoints
+from datetime import datetime
