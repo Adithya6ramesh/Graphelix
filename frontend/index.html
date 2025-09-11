@@ -351,10 +351,14 @@
                         <div class="form-group">
                             <label for="registerRole">Role:</label>
                             <select id="registerRole" required>
-                                <option value="victim"> Victim (Report Content)</option>
-                                <option value="officer"> Officer (Review Cases)</option>
-                                <option value="admin"> Admin (Manage System)</option>
+                                <option value="victim">👤 Victim (Report Content)</option>
+                                <option value="admin">👑 Admin (Manage System)</option>
                             </select>
+                        </div>
+                        <div id="adminIdGroup" class="form-group hidden">
+                            <label for="adminId">Admin ID:</label>
+                            <input type="text" id="adminId" placeholder="Enter admin verification ID">
+                            <small style="color: #94a3b8; font-size: 0.8em;">Required for admin registration</small>
                         </div>
                         <button type="submit" class="btn">Register</button>
                     </form>
@@ -431,9 +435,10 @@
             <p style="color: #94a3b8; margin-bottom: 20px;">System administration and oversight</p>
             
             <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
-                <button id="adminLoadCasesBtn" class="btn"> All Cases</button>
-                <button id="systemStatsBtn" class="btn"> System Stats</button>
-                <button id="userManagementBtn" class="btn"> User Management</button>
+                <button id="adminLoadCasesBtn" class="btn">📋 All Cases</button>
+                <button id="systemStatsBtn" class="btn">📊 System Stats</button>
+                <button id="userManagementBtn" class="btn">👥 User Management</button>
+                <button id="createUserBtn" class="btn">➕ Create User</button>
             </div>
             
             <div id="adminContainer">
@@ -488,6 +493,17 @@
         showLoginBtn.addEventListener('click', () => {
             registerFormContainer.classList.add('hidden');
             loginFormContainer.classList.remove('hidden');
+        });
+
+        // Show/hide admin ID field based on role selection
+        document.getElementById('registerRole').addEventListener('change', function() {
+            const adminIdGroup = document.getElementById('adminIdGroup');
+            if (this.value === 'admin') {
+                adminIdGroup.classList.remove('hidden');
+            } else {
+                adminIdGroup.classList.add('hidden');
+                document.getElementById('adminId').value = '';
+            }
         });
 
         // Utility Functions
@@ -608,17 +624,35 @@
             const email = document.getElementById('registerEmail').value;
             const password = document.getElementById('registerPassword').value;
             const role = document.getElementById('registerRole').value;
+            const adminId = document.getElementById('adminId').value;
+
+            // Validate admin ID if admin role is selected
+            if (role === 'admin') {
+                if (!adminId || adminId !== '1234') {
+                    showStatus('❌ Invalid Admin ID. Please enter the correct verification ID.', 'error');
+                    return;
+                }
+            }
 
             try {
                 showStatus('Creating account...', 'info');
                 
+                const payload = { email, password };
+                if (role === 'admin' && adminId) {
+                    payload.admin_id = adminId;
+                }
+                
                 await apiCall('/api/auth/register', {
                     method: 'POST',
-                    body: JSON.stringify({ email, password, role })
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
                 });
 
                 showStatus('✅ Account created! You can now login.', 'success');
                 registerForm.reset();
+                document.getElementById('adminIdGroup').classList.add('hidden');
                 
             } catch (error) {
                 showStatus(`❌ Registration failed: ${error.message}`, 'error');
@@ -964,6 +998,12 @@
                     await loadUserManagement();
                 });
             }
+
+            if (document.getElementById('createUserBtn')) {
+                document.getElementById('createUserBtn').addEventListener('click', async () => {
+                    await showCreateUserForm();
+                });
+            }
         });
 
         // Admin Functions
@@ -1190,6 +1230,79 @@
             } catch (error) {
                 showStatus(`❌ Failed to update role: ${error.message}`, 'error');
             }
+        }
+
+        async function showCreateUserForm() {
+            const adminContainer = document.getElementById('adminContainer');
+            
+            adminContainer.innerHTML = `
+                <h4 style="color: #e2e8f0; margin-bottom: 15px;">➕ Create New User</h4>
+                <div style="background: #1e293b; padding: 20px; border-radius: 8px; max-width: 500px;">
+                    <form id="adminCreateUserForm">
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; color: #e2e8f0; margin-bottom: 5px;">Email:</label>
+                            <input type="email" id="adminCreateEmail" required 
+                                   style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #475569; background: #374151; color: #e2e8f0;"
+                                   placeholder="user@example.com">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; color: #e2e8f0; margin-bottom: 5px;">Password:</label>
+                            <input type="password" id="adminCreatePassword" required 
+                                   style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #475569; background: #374151; color: #e2e8f0;"
+                                   placeholder="Choose a secure password">
+                        </div>
+                        <div style="margin-bottom: 15px;">
+                            <label style="display: block; color: #e2e8f0; margin-bottom: 5px;">Role:</label>
+                            <select id="adminCreateRole" required 
+                                    style="width: 100%; padding: 10px; border-radius: 5px; border: 1px solid #475569; background: #374151; color: #e2e8f0;">
+                                <option value="victim">👤 Victim (Report Content)</option>
+                                <option value="officer">👮 Officer (Review Cases)</option>
+                                <option value="admin">👑 Admin (Manage System)</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; gap: 10px;">
+                            <button type="submit" class="btn" style="background: #16a34a;">Create User</button>
+                            <button type="button" onclick="loadUserManagement()" class="btn" style="background: #64748b;">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+
+            // Add form submission handler
+            document.getElementById('adminCreateUserForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const email = document.getElementById('adminCreateEmail').value;
+                const password = document.getElementById('adminCreatePassword').value;
+                const role = document.getElementById('adminCreateRole').value;
+
+                try {
+                    showStatus('Creating user...', 'info');
+                    
+                    const response = await fetch(`${API_BASE}/api/admin/create-user`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${currentToken}`
+                        },
+                        body: JSON.stringify({ email, password, role })
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || `HTTP ${response.status}: ${response.statusText}`);
+                    }
+
+                    const newUser = await response.json();
+                    showStatus(`✅ User ${newUser.email} created successfully as ${newUser.role}`, 'success');
+                    
+                    // Go back to user management
+                    await loadUserManagement();
+                    
+                } catch (error) {
+                    showStatus(`❌ Failed to create user: ${error.message}`, 'error');
+                }
+            });
         }
 
         // Initialize UI

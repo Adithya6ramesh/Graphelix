@@ -3,12 +3,13 @@ from fastapi.security import HTTPBearer
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db, init_db
-from app.auth import get_current_user, create_access_token, verify_password, get_password_hash
+from app.auth import get_current_user, create_access_token, verify_password, get_password_hash, require_admin
 from app.models.user import User, UserRole
 from app.routers import cases, admin
 from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from datetime import datetime
+from typing import Optional
 import contextlib
 
 app = FastAPI(title="Take It Down API", version="1.0.0")
@@ -16,7 +17,12 @@ app = FastAPI(title="Take It Down API", version="1.0.0")
 # Enable CORS for frontend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000", 
+        "http://127.0.0.1:3000",
+        "http://localhost:8080", 
+        "http://127.0.0.1:8080"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,16 +33,19 @@ app.include_router(cases.router)
 app.include_router(admin.router)
 
 # Pydantic models for requests/responses
-class UserCreate(BaseModel):
+class PublicUserCreate(BaseModel):
     email: EmailStr
     password: str
-    role: UserRole = UserRole.VICTIM
+    admin_id: Optional[str] = None
 
+class AdminUserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    role: UserRole
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
-
 
 class Token(BaseModel):
     access_token: str
@@ -69,8 +78,47 @@ async def startup_event():
 
 
 @app.post("/api/auth/register", response_model=UserResponse)
-async def register(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
-    """Register a new user"""
+async def register(user_data: PublicUserCreate, db: AsyncSession = Depends(get_db)):
+    """Register a new user (victim or admin with valid admin_id)"""
+    # Check if user exists
+    result = await db.execute(select(User).where(User.email == user_data.email))
+    if result.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+    
+    # Determine role based on admin_id
+    role = UserRole.VICTIM
+    if user_data.admin_id:
+        if user_data.admin_id != "1234":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid admin ID"
+            )
+        role = UserRole.ADMIN
+    
+    # Create user
+    hashed_password = get_password_hash(user_data.password)
+    user = User(
+        email=user_data.email,
+        hashed_password=hashed_password,
+        role=role
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    
+    return user
+
+
+@app.post("/api/admin/create-user", response_model=UserResponse)
+async def admin_create_user(
+    user_data: AdminUserCreate, 
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Admin creates a new user (admin, officer, or victim)"""
     # Check if user exists
     result = await db.execute(select(User).where(User.email == user_data.email))
     if result.scalar_one_or_none():
